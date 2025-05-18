@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Anti-Theft Alarm</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      text-align: center;
+      background-color: #1e2a38;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    select {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #00adb5;
+      border: none;
+      padding: 12px 20px;
+      margin: 10px;
+      border-radius: 10px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #007b8a;
+    }
+
+    .danger {
+      background-color: #e63946;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .error {
+      color: #ff6b6b;
+      font-size: 14px;
+    }
+
+    .status {
+      margin: 10px;
+      font-weight: bold;
+    }
+
+    .alert-popup {
+      background-color: #ff1e1e;
+      color: white;
+      padding: 15px;
+      font-size: 20px;
+      font-weight: bold;
+      margin: 15px auto;
+      border-radius: 10px;
+      max-width: 300px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Page -->
+  <div class="container" id="loginPage">
+    <h2>Login to Alarm</h2>
+    <input type="text" id="username" placeholder="Username" />
+    <input type="password" id="password" placeholder="Password" />
+    <div id="errorMsg" class="error hidden">Invalid credentials!</div>
+    <button onclick="login()">Login</button>
+  </div>
+
+  <!-- Main App Page -->
+  <div class="container hidden" id="mainApp">
+    <h1>📱 Anti-Theft Alarm</h1>
+
+    <div class="controls">
+      <div class="status" id="connectionStatus">🔌 Disconnected</div>
+      <button id="connectBtn">Connect to Watch</button>
+
+      <div id="alertBox" class="alert-popup">ALERT!!!!!</div>
+
+      <label for="alarmMode">Alarm Mode</label>
+      <select id="alarmMode">
+        <option value="sound">Sound</option>
+        <option value="vibration">Vibration</option>
+        <option value="both">Sound & Vibration</option>
+      </select>
+
+      <button id="activateBtn">Activate Alarm</button>
+      <label for="sensitivity">Sensitivity</label>
+      <input type="range" id="sensitivity" min="1" max="10" value="5" />
+      <button id="testSound">Test Alarm</button>
+    </div>
+
+    <div id="alarmActive" class="hidden">
+      <p>🚨 Alarm is ACTIVE!</p>
+      <button id="deactivateBtn" class="danger">Deactivate</button>
+    </div>
+  </div>
+
+  <script>
+    const validUser = "admin";
+    const validPass = "1234";
+
+    function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const errorMsg = document.getElementById("errorMsg");
+
+      if (username === validUser && password === validPass) {
+        document.getElementById("loginPage").classList.add("hidden");
+        document.getElementById("mainApp").classList.remove("hidden");
+      } else {
+        errorMsg.classList.remove("hidden");
+      }
+    }
+
+    const connectBtn = document.getElementById("connectBtn");
+    const connectionStatus = document.getElementById("connectionStatus");
+    const alertBox = document.getElementById("alertBox");
+    let isConnected = false;
+
+    connectBtn.addEventListener("click", () => {
+      isConnected = !isConnected;
+      connectionStatus.textContent = isConnected ? "✅ Connected to Watch" : "🔌 Disconnected";
+      connectBtn.textContent = isConnected ? "Disconnect" : "Connect to Watch";
+
+      if (isConnected) {
+        alertBox.style.display = "block";
+        setTimeout(() => {
+          alertBox.style.display = "none";
+        }, 3000);
+      }
+    });
+
+    const activateBtn = document.getElementById("activateBtn");
+    const deactivateBtn = document.getElementById("deactivateBtn");
+    const alarmActive = document.getElementById("alarmActive");
+    const testSound = document.getElementById("testSound");
+    const alarmMode = document.getElementById("alarmMode");
+
+    let alarmSound = new Audio("https://www.soundjay.com/button/beep-07.wav");
+
+    function triggerAlarm() {
+      const mode = alarmMode.value;
+
+      if (mode === "sound" || mode === "both") {
+        alarmSound.play();
+      }
+
+      if (mode === "vibration" || mode === "both") {
+        if ("vibrate" in navigator) {
+          navigator.vibrate([500, 200, 500]);
+        }
+      }
+
+      alert("🚨 Theft detected! Alarm triggered.");
+    }
+
+    activateBtn.addEventListener("click", () => {
+      if (!isConnected) {
+        alert("❗ Please connect to the watch first!");
+        return;
+      }
+      alarmActive.classList.remove("hidden");
+
+      setTimeout(() => {
+        triggerAlarm();
+      }, 3000);
+    });
+
+    deactivateBtn.addEventListener("click", () => {
+      alarmActive.classList.add("hidden");
+    });
+
+    testSound.addEventListener("click", () => {
+      triggerAlarm();
+    });
+  </script>
+</body>
+</html>
