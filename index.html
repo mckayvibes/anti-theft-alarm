@@ -121,7 +121,34 @@
     let isConnected = false;
     let alarmActive = false;
 
-    const alarmSound = new Audio("https://www.soundjay.com/button/beep-07.wav");
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+function playBeep() {
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  oscillator.type = 'sine'; // You can try 'square', 'sawtooth', etc.
+  oscillator.frequency.value = 440; // A4 note (adjust for pitch)
+  gainNode.gain.value = 0.2; // Adjust volume (0.0 to 1.0)
+
+  oscillator.start();
+  setTimeout(() => oscillator.stop(), 500); // Play for 500 milliseconds
+}
+
+function triggerAlarm() {
+  if (!alarmActive) {
+    alertBox.style.display = "block";
+    playBeep(); // Play the beep sound
+    if ("vibrate" in navigator) {
+      navigator.vibrate([500, 200, 500, 200, 500]);
+    }
+    alarmActive = true;
+    console.log("Alarm triggered by ESP32!");
+  }
+}
 
     async function startBLEConnection() {
       if (bleDevice && bleDevice.gatt.connected) {
@@ -165,30 +192,30 @@
     connectBtn.addEventListener("click", startBLEConnection);
 
     function handleAlert(event) {
-      const value = new TextDecoder().decode(event.target.value);
-      console.log("Notification received:", value);
+  const value = new TextDecoder().decode(event.target.value);
+  console.log("Notification received:", value);
 
-      if (value === "ALERT" && isConnected) {
-        triggerAlarm();
-        alertBox.style.display = "block"; // Show the alert box
-      } else if (value === "NEAR" && isConnected) {
-        stopAlarm();
-        alertBox.style.display = "none"; // Hide the alert box
-      }
-    }
+  if (value === "ALERT" && isConnected) {
+    triggerAlarm();
+    alertBox.style.display = "block"; // Make sure this line is present
+  } else if (value === "NEAR" && isConnected) {
+    stopAlarm();
+    alertBox.style.display = "none";
+  }
+}
 
     function triggerAlarm() {
-      if (!alarmActive) {
-        alarmBox.style.display = "block"; // Ensure it's visible when triggering
-        alarmSound.loop = true;
-        alarmSound.play();
-        if ("vibrate" in navigator) {
-          navigator.vibrate([500, 200, 500, 200, 500]);
-        }
-        alarmActive = true;
-        console.log("Alarm triggered by ESP32!");
-      }
+  if (!alarmActive) {
+    alertBox.style.display = "block"; // Ensure this is here
+    alarmSound.loop = true;
+    alarmSound.play();
+    if ("vibrate" in navigator) {
+      navigator.vibrate([500, 200, 500, 200, 500]);
     }
+    alarmActive = true;
+    console.log("Alarm triggered by ESP32!");
+  }
+}
 
     function stopAlarm() {
       if (alarmActive) {
