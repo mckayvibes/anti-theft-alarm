@@ -4,12 +4,12 @@ connectBtn.addEventListener("click", async () => {
   try {
     bleDevice = await navigator.bluetooth.requestDevice({
       filters: [{ name: "ESP32 AntiTheft" }],
-      optionalServices: ["7e1fd874-2aa2-4391-9f2e-5405bedd91d8"]
+      optionalServices: ["a1b2c3d4-e5f6-7890-1234-567890abcdef"]
     });
 
     bleServer = await bleDevice.gatt.connect();
-    bleService = await bleServer.getPrimaryService("7e1fd874-2aa2-4391-9f2e-5405bedd91d8");
-    bleChar = await bleService.getCharacteristic("7e1fd874-2aa2-4391-9f2e-5405bedd91d8");
+    bleService = await bleServer.getPrimaryService("a1b2c3d4-e5f6-7890-1234-567890abcdef");
+    bleChar = await bleService.getCharacteristic("a1b2c3d4-e5f6-7890-1234-567890abcdef");
 
     await bleChar.startNotifications();
     bleChar.addEventListener("characteristicvaluechanged", handleAlert);
