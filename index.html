@@ -27,7 +27,7 @@
     .hidden {
       display: none;
     }
-    input[type="text"], input[type="password"], select {
+    input[type="text"], input[type="password"] {
       width: 100%;
       padding: 10px;
       margin: 10px 0;
@@ -52,9 +52,6 @@
     .danger {
       background-color: #e63946;
     }
-    input[type="range"] {
-      width: 100%;
-    }
     .error {
       color: #ff6b6b;
       font-size: 14px;
@@ -77,7 +74,6 @@
   </style>
 </head>
 <body>
-  <!-- Login Page -->
   <div class="container" id="loginPage">
     <h2>Login to Alarm</h2>
     <input type="text" id="username" placeholder="Username" />
@@ -86,36 +82,16 @@
     <button onclick="login()">Login</button>
   </div>
 
-  <!-- Main App Page -->
   <div class="container hidden" id="mainApp">
     <h1>📱 Anti-Theft Alarm</h1>
 
     <div class="controls">
       <div class="status" id="connectionStatus">🔌 Disconnected</div>
-      <button id="connectBtn">Connect to Watch</button>
-
+      <button id="connectBtn">Connect to ESP32</button>
       <div id="alertBox" class="alert-popup">ALERT!!!!!</div>
-
-      <label for="alarmMode">Alarm Mode</label>
-      <select id="alarmMode">
-        <option value="sound">Sound</option>
-        <option value="vibration">Vibration</option>
-        <option value="both">Sound & Vibration</option>
-      </select>
-
-      <button id="activateBtn">Activate Alarm</button>
-      <label for="sensitivity">Sensitivity</label>
-      <input type="range" id="sensitivity" min="1" max="10" value="5" />
-      <button id="testSound">Test Alarm</button>
-    </div>
-
-    <div id="alarmActive" class="hidden">
-      <p>🚨 Alarm is ACTIVE!</p>
-      <button id="deactivateBtn" class="danger">Deactivate</button>
     </div>
   </div>
 
-  <!-- JavaScript -->
   <script>
     const validUser = "admin";
     const validPass = "1234";
@@ -128,6 +104,7 @@
       if (username === validUser && password === validPass) {
         document.getElementById("loginPage").classList.add("hidden");
         document.getElementById("mainApp").classList.remove("hidden");
+        startBLEConnection(); // Initiate connection after login
       } else {
         errorMsg.classList.remove("hidden");
       }
@@ -136,93 +113,94 @@
     const connectBtn = document.getElementById("connectBtn");
     const connectionStatus = document.getElementById("connectionStatus");
     const alertBox = document.getElementById("alertBox");
-    const activateBtn = document.getElementById("activateBtn");
-    const deactivateBtn = document.getElementById("deactivateBtn");
-    const alarmActive = document.getElementById("alarmActive");
-    const testSound = document.getElementById("testSound");
-    const alarmMode = document.getElementById("alarmMode");
 
     let bleDevice;
     let bleServer;
     let bleService;
-    let bleChar;
+    let alertCharacteristic; // Changed name to be more specific
     let isConnected = false;
+    let alarmActive = false;
 
     const alarmSound = new Audio("https://www.soundjay.com/button/beep-07.wav");
 
-    connectBtn.addEventListener("click", async () => {
+    async function startBLEConnection() {
       if (bleDevice && bleDevice.gatt.connected) {
         bleDevice.gatt.disconnect();
         connectionStatus.textContent = "🔌 Disconnected";
-        connectBtn.textContent = "Connect to Watch";
+        connectBtn.textContent = "Connect to ESP32";
         isConnected = false;
+        stopAlarm();
+        alertBox.style.display = "none"; // Ensure alert box is hidden on disconnect
         return;
       }
 
       try {
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ name: "ESP32 AntiTheft" }],
-          optionalServices: ["7e1fd874-2aa2-4391-9f2e-5405bedd91d8"]
+          optionalServices: ["a1b2c3d4-e5f6-7890-1234-567890abcdef"]
         });
 
         bleServer = await bleDevice.gatt.connect();
-        bleService = await bleServer.getPrimaryService("7e1fd874-2aa2-4391-9f2e-5405bedd91d8");
-        bleChar = await bleService.getCharacteristic("7e1fd874-2aa2-4391-9f2e-5405bedd91d8");
+        bleService = await bleServer.getPrimaryService("a1b2c3d4-e5f6-7890-1234-567890abcdef");
+        alertCharacteristic = await bleService.getCharacteristic("a1b2c3d4-e5f6-7890-1234-567890abcdef");
 
-        await bleChar.startNotifications();
-        bleChar.addEventListener("characteristicvaluechanged", handleAlert);
+        await alertCharacteristic.startNotifications();
+        alertCharacteristic.addEventListener("characteristicvaluechanged", handleAlert);
 
-        connectionStatus.textContent = "✅ Connected to Watch";
+        connectionStatus.textContent = "✅ Connected to ESP32";
         connectBtn.textContent = "Disconnect";
         isConnected = true;
+        alertBox.style.display = "none"; // Hide alert box on successful connection
+        stopAlarm();
       } catch (err) {
         alert("BLE connection failed: " + err);
+        connectionStatus.textContent = "❌ Connection Failed";
+        connectBtn.textContent = "Connect to ESP32";
+        isConnected = false;
+        stopAlarm();
+        alertBox.style.display = "none"; // Ensure alert box is hidden on connection failure
       }
-    });
+    }
+
+    connectBtn.addEventListener("click", startBLEConnection);
 
     function handleAlert(event) {
       const value = new TextDecoder().decode(event.target.value);
       console.log("Notification received:", value);
 
-      if (value === "ALERT") {
-        alertBox.style.display = "block";
+      if (value === "ALERT" && isConnected) {
         triggerAlarm();
-        setTimeout(() => alertBox.style.display = "none", 3000);
+        alertBox.style.display = "block"; // Show the alert box
+      } else if (value === "NEAR" && isConnected) {
+        stopAlarm();
+        alertBox.style.display = "none"; // Hide the alert box
       }
     }
 
     function triggerAlarm() {
-      const mode = alarmMode.value;
-
-      if (mode === "sound" || mode === "both") {
+      if (!alarmActive) {
+        alarmBox.style.display = "block"; // Ensure it's visible when triggering
+        alarmSound.loop = true;
         alarmSound.play();
-      }
-
-      if (mode === "vibration" || mode === "both") {
         if ("vibrate" in navigator) {
-          navigator.vibrate([500, 200, 500]);
+          navigator.vibrate([500, 200, 500, 200, 500]);
         }
+        alarmActive = true;
+        console.log("Alarm triggered by ESP32!");
       }
-
-      alert("🚨 Theft detected! Alarm triggered.");
     }
 
-    activateBtn.addEventListener("click", () => {
-      if (!isConnected) {
-        alert("❗ Please connect to the watch first!");
-        return;
+    function stopAlarm() {
+      if (alarmActive) {
+        alarmSound.pause();
+        alarmSound.currentTime = 0;
+        if ("vibrate" in navigator) {
+          navigator.vibrate(0);
+        }
+        alarmActive = false;
+        console.log("Alarm stopped by ESP32!");
       }
-      alarmActive.classList.remove("hidden");
-      setTimeout(triggerAlarm, 3000);
-    });
-
-    deactivateBtn.addEventListener("click", () => {
-      alarmActive.classList.add("hidden");
-    });
-
-    testSound.addEventListener("click", () => {
-      triggerAlarm();
-    });
+    }
   </script>
 </body>
 </html>
