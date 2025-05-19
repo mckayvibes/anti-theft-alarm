@@ -15,7 +15,6 @@
       height: 100vh;
       margin: 0;
     }
-
     .container {
       text-align: center;
       background-color: #1e2a38;
@@ -25,14 +24,10 @@
       max-width: 400px;
       width: 100%;
     }
-
     .hidden {
       display: none;
     }
-
-    input[type="text"],
-    input[type="password"],
-    select {
+    input[type="text"], input[type="password"], select {
       width: 100%;
       padding: 10px;
       margin: 10px 0;
@@ -40,7 +35,6 @@
       border-radius: 8px;
       font-size: 16px;
     }
-
     button {
       background-color: #00adb5;
       border: none;
@@ -52,29 +46,23 @@
       cursor: pointer;
       transition: background 0.3s ease;
     }
-
     button:hover {
       background-color: #007b8a;
     }
-
     .danger {
       background-color: #e63946;
     }
-
     input[type="range"] {
       width: 100%;
     }
-
     .error {
       color: #ff6b6b;
       font-size: 14px;
     }
-
     .status {
       margin: 10px;
       font-weight: bold;
     }
-
     .alert-popup {
       background-color: #ff1e1e;
       color: white;
@@ -127,6 +115,7 @@
     </div>
   </div>
 
+  <!-- JavaScript -->
   <script>
     const validUser = "admin";
     const validPass = "1234";
@@ -147,28 +136,60 @@
     const connectBtn = document.getElementById("connectBtn");
     const connectionStatus = document.getElementById("connectionStatus");
     const alertBox = document.getElementById("alertBox");
-    let isConnected = false;
-
-    connectBtn.addEventListener("click", () => {
-      isConnected = !isConnected;
-      connectionStatus.textContent = isConnected ? "✅ Connected to Watch" : "🔌 Disconnected";
-      connectBtn.textContent = isConnected ? "Disconnect" : "Connect to Watch";
-
-      if (isConnected) {
-        alertBox.style.display = "block";
-        setTimeout(() => {
-          alertBox.style.display = "none";
-        }, 3000);
-      }
-    });
-
     const activateBtn = document.getElementById("activateBtn");
     const deactivateBtn = document.getElementById("deactivateBtn");
     const alarmActive = document.getElementById("alarmActive");
     const testSound = document.getElementById("testSound");
     const alarmMode = document.getElementById("alarmMode");
 
-    let alarmSound = new Audio("https://www.soundjay.com/button/beep-07.wav");
+    let bleDevice;
+    let bleServer;
+    let bleService;
+    let bleChar;
+    let isConnected = false;
+
+    const alarmSound = new Audio("https://www.soundjay.com/button/beep-07.wav");
+
+    connectBtn.addEventListener("click", async () => {
+      if (bleDevice && bleDevice.gatt.connected) {
+        bleDevice.gatt.disconnect();
+        connectionStatus.textContent = "🔌 Disconnected";
+        connectBtn.textContent = "Connect to Watch";
+        isConnected = false;
+        return;
+      }
+
+      try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ name: "ESP32 AntiTheft" }],
+          optionalServices: ["180F"]
+        });
+
+        bleServer = await bleDevice.gatt.connect();
+        bleService = await bleServer.getPrimaryService("180F");
+        bleChar = await bleService.getCharacteristic("2A19");
+
+        await bleChar.startNotifications();
+        bleChar.addEventListener("characteristicvaluechanged", handleAlert);
+
+        connectionStatus.textContent = "✅ Connected to Watch";
+        connectBtn.textContent = "Disconnect";
+        isConnected = true;
+      } catch (err) {
+        alert("BLE connection failed: " + err);
+      }
+    });
+
+    function handleAlert(event) {
+      const value = new TextDecoder().decode(event.target.value);
+      console.log("Notification received:", value);
+
+      if (value === "ALERT") {
+        alertBox.style.display = "block";
+        triggerAlarm();
+        setTimeout(() => alertBox.style.display = "none", 3000);
+      }
+    }
 
     function triggerAlarm() {
       const mode = alarmMode.value;
@@ -192,10 +213,7 @@
         return;
       }
       alarmActive.classList.remove("hidden");
-
-      setTimeout(() => {
-        triggerAlarm();
-      }, 3000);
+      setTimeout(triggerAlarm, 3000);
     });
 
     deactivateBtn.addEventListener("click", () => {
@@ -208,3 +226,4 @@
   </script>
 </body>
 </html>
+
