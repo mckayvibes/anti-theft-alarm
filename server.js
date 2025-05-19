@@ -1,28 +1,23 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+connectBtn.addEventListener("click", async () => {
+  // ... existing code ...
 
-const app = express();
-const PORT = 3000;
+  try {
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ name: "ESP32 AntiTheft" }],
+      optionalServices: ["7e1fd874-2aa2-4391-9f2e-5405bedd91d8"]
+    });
 
-app.use(cors());
-app.use(bodyParser.json());
+    bleServer = await bleDevice.gatt.connect();
+    bleService = await bleServer.getPrimaryService("7e1fd874-2aa2-4391-9f2e-5405bedd91d8");
+    bleChar = await bleService.getCharacteristic("7e1fd874-2aa2-4391-9f2e-5405bedd91d8");
 
-const users = [
-  { username: 'admin', password: '1234' }
-];
+    await bleChar.startNotifications();
+    bleChar.addEventListener("characteristicvaluechanged", handleAlert);
 
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = users.find(u => u.username === username && u.password === password);
-
-  if (user) {
-    res.json({ success: true });
-  } else {
-    res.status(401).json({ success: false });
+    connectionStatus.textContent = "✅ Connected to Watch";
+    connectBtn.textContent = "Disconnect";
+    isConnected = true;
+  } catch (err) {
+    alert("BLE connection failed: " + err);
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`✅ Backend running at http://localhost:${PORT}`);
 });
