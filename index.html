@@ -178,12 +178,12 @@ function stopAlarm() {
       try {
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ name: "ESP32 AntiTheft" }],
-          optionalServices: ["a1b2c3d4-e5f6-7890-1234-567890abcdef"]
+          optionalServices: ["4fafc201-1fb5-459e-8fcc-c5c9c331914b"]
         });
 
         bleServer = await bleDevice.gatt.connect();
-        bleService = await bleServer.getPrimaryService("a1b2c3d4-e5f6-7890-1234-567890abcdef");
-        alertCharacteristic = await bleService.getCharacteristic("a1b2c3d4-e5f6-7890-1234-567890abcdef");
+        bleService = await bleServer.getPrimaryService("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
+        alertCharacteristic = await bleService.getCharacteristic("beb5483e-36e1-4688-b7f5-ea07361b26a8");
 
         await alertCharacteristic.startNotifications();
         alertCharacteristic.addEventListener("characteristicvaluechanged", handleAlert);
