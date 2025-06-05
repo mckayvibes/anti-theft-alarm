@@ -61,27 +61,27 @@
       font-weight: bold;
     }
     .alert-popup {
-    background-color: #ff1e1e; /* Default red for ALERT */
-    color: white;
-    padding: 15px;
-    font-size: 20px;
-    font-weight: bold;
-    margin: 15px auto;
-    border-radius: 10px;
-    max-width: 300px;
-    display: none;
-  }
-  .near-popup {
-    background-color: #4CAF50; /* Green for NEAR */
-    color: white;
-    padding: 15px;
-    font-size: 20px;
-    font-weight: bold;
-    margin: 15px auto;
-    border-radius: 10px;
-    max-width: 300px;
-    display: none;
-  }
+      background-color: #ff1e1e; /* Default red for ALERT */
+      color: white;
+      padding: 15px;
+      font-size: 20px;
+      font-weight: bold;
+      margin: 15px auto;
+      border-radius: 10px;
+      max-width: 300px;
+      display: none;
+    }
+    .near-popup {
+      background-color: #4CAF50; /* Green for NEAR */
+      color: white;
+      padding: 15px;
+      font-size: 20px;
+      font-weight: bold;
+      margin: 15px auto;
+      border-radius: 10px;
+      max-width: 300px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -95,7 +95,6 @@
 
   <div class="container hidden" id="mainApp">
     <h1>📱 Anti-Theft Alarm</h1>
-
     <div class="controls">
       <div class="status" id="connectionStatus">🔌 Disconnected</div>
       <button id="connectBtn">Connect to ESP32</button>
@@ -103,152 +102,131 @@
     </div>
   </div>
 
+  <!-- Add audio element for the alarm sound -->
+  <audio id="alarmSound" src="digital-alarm-buzzer.wav" preload="auto"></audio>
+
   <script>
-    const validUser = "admin";
-    const validPass = "1234";
+    const validUser = "admin";
+    const validPass = "1234";
 
-    function login() {
-      const username = document.getElementById("username").value;
-      const password = document.getElementById("password").value;
-      const errorMsg = document.getElementById("errorMsg");
+    function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const errorMsg = document.getElementById("errorMsg");
 
-      if (username === validUser && password === validPass) {
-        document.getElementById("loginPage").classList.add("hidden");
-        document.getElementById("mainApp").classList.remove("hidden");
-        startBLEConnection(); // Initiate connection after login
-      } else {
-        errorMsg.classList.remove("hidden");
-      }
-    }
+      if (username === validUser && password === validPass) {
+        document.getElementById("loginPage").classList.add("hidden");
+        document.getElementById("mainApp").classList.remove("hidden");
+        startBLEConnection(); // Initiate connection after login
+      } else {
+        errorMsg.classList.remove("hidden");
+      }
+    }
 
-    const connectBtn = document.getElementById("connectBtn");
-    const connectionStatus = document.getElementById("connectionStatus");
-    const alertBox = document.getElementById("alertBox");
+    const connectBtn = document.getElementById("connectBtn");
+    const connectionStatus = document.getElementById("connectionStatus");
+    const alertBox = document.getElementById("alertBox");
+    const alarmSound = document.getElementById("alarmSound");
 
-    let bleDevice;
-    let bleServer;
-    let bleService;
-    let alertCharacteristic; // Changed name to be more specific
-    let isConnected = false;
-    let alarmActive = false;
+    let bleDevice;
+    let bleServer;
+    let bleService;
+    let alertCharacteristic;
+    let isConnected = false;
+    let alarmActive = false;
 
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep() {
+      alarmSound.volume = 1.0; // Set volume to maximum
+      alarmSound.loop = true; // Loop the sound for continuous playback
+      alarmSound.play().catch(err => console.error("Audio playback failed:", err));
+    }
 
-let oscillatorNode; // Declare a variable to hold the oscillator
+    function stopAlarm() {
+      if (alarmActive) {
+        alarmSound.pause(); // Stop the audio
+        alarmSound.currentTime = 0; // Reset to start
+        if ("vibrate" in navigator) {
+          navigator.vibrate(0);
+        }
+        alarmActive = false;
+        console.log("Alarm stopped by ESP32!");
+      }
+    }
 
-function playBeep() {
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
+    async function startBLEConnection() {
+      if (bleDevice && bleDevice.gatt.connected) {
+        bleDevice.gatt.disconnect();
+        connectionStatus.textContent = "🔌 Disconnected";
+        connectBtn.textContent = "Connect to ESP32";
+        isConnected = false;
+        stopAlarm();
+        alertBox.style.display = "none";
+        return;
+      }
 
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
+      try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ name: "ESP32 AntiTheft" }],
+          optionalServices: ["4fafc201-1fb5-459e-8fcc-c5c9c331914b"]
+        });
 
-  oscillator.type = 'sine';
-  oscillator.frequency.value = 440;
-  gainNode.gain.value = 0.2;
+        bleServer = await bleDevice.gatt.connect();
+        bleService = await bleServer.getPrimaryService("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
+        alertCharacteristic = await bleService.getCharacteristic("beb5483e-36e1-4688-b7f5-ea07361b26a8");
 
-  oscillator.start();
-  oscillatorNode = oscillator; // Store the oscillator node so we can stop it later
-}
-function stopAlarm() {
-  if (alarmActive) {
-    if (oscillatorNode) { // Check if an oscillator is playing
-      oscillatorNode.stop(); // Stop the oscillator
-      oscillatorNode = null; // Clear the stored oscillator
-    }
-    if ("vibrate" in navigator) {
-      navigator.vibrate(0);
-    }
-    alarmActive = false;
-    console.log("Alarm stopped by ESP32!");
-  }
-}
+        await alertCharacteristic.startNotifications();
+        alertCharacteristic.addEventListener("characteristicvaluechanged", handleAlert);
 
-    async function startBLEConnection() {
-      if (bleDevice && bleDevice.gatt.connected) {
-        bleDevice.gatt.disconnect();
-        connectionStatus.textContent = "🔌 Disconnected";
-        connectBtn.textContent = "Connect to ESP32";
-        isConnected = false;
-        stopAlarm();
-        alertBox.style.display = "none"; // Ensure alert box is hidden on disconnect
-        return;
-      }
+        connectionStatus.textContent = "✅ Connected to ESP32";
+        connectBtn.textContent = "Disconnect";
+        isConnected = true;
+        alertBox.style.display = "none";
+        stopAlarm();
+      } catch (err) {
+        alert("BLE connection failed: " + err);
+        connectionStatus.textContent = "❌ Connection Failed";
+        connectBtn.textContent = "Connect to ESP32";
+        isConnected = false;
+        stopAlarm();
+        alertBox.style.display = "none";
+      }
+    }
 
-      try {
-        bleDevice = await navigator.bluetooth.requestDevice({
-          filters: [{ name: "ESP32 AntiTheft" }],
-          optionalServices: ["4fafc201-1fb5-459e-8fcc-c5c9c331914b"]
-        });
 
-        bleServer = await bleDevice.gatt.connect();
-        bleService = await bleServer.getPrimaryService("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
-        alertCharacteristic = await bleService.getCharacteristic("beb5483e-36e1-4688-b7f5-ea07361b26a8");
 
-        await alertCharacteristic.startNotifications();
-        alertCharacteristic.addEventListener("characteristicvaluechanged", handleAlert);
+    connectBtn.addEventListener("click", startBLEConnection);
 
-        connectionStatus.textContent = "✅ Connected to ESP32";
-        connectBtn.textContent = "Disconnect";
-        isConnected = true;
-        alertBox.style.display = "none"; // Hide alert box on successful connection
-        stopAlarm();
-      } catch (err) {
-        alert("BLE connection failed: " + err);
-        connectionStatus.textContent = "❌ Connection Failed";
-        connectBtn.textContent = "Connect to ESP32";
-        isConnected = false;
-        stopAlarm();
-        alertBox.style.display = "none"; // Ensure alert box is hidden on connection failure
-      }
-    }
+    function handleAlert(event) {
+      const value = new TextDecoder().decode(event.target.value);
+      console.log("Notification received:", value);
 
-    connectBtn.addEventListener("click", startBLEConnection);
+      if (value === "ALERT" && isConnected) {
+        alertBox.textContent = "ALERT!!!!!";
+        alertBox.className = "alert-popup";
+        alertBox.style.display = "block";
+        triggerAlarm();
+      } else if (value === "NEAR" && isConnected) {
+        alertBox.textContent = "NEAR";
+        alertBox.className = "near-popup";
+        alertBox.style.display = "block";
+        stopAlarm();
+      } else {
+        alertBox.style.display = "none";
+      }
+    }
 
-   function handleAlert(event) {
-  const value = new TextDecoder().decode(event.target.value);
-  console.log("Notification received:", value);
+    function triggerAlarm() {
+      if (!alarmActive) {
+        alertBox.style.display = "block";
+        playBeep();
+        if ("vibrate" in navigator) {
+          navigator.vibrate([500, 200, 500, 200, 500]);
+        }
+        alarmActive = true;
+        console.log("Alarm triggered by ESP32!");
+      }
+    }
 
-  if (value === "ALERT" && isConnected) {
-    alertBox.textContent = "ALERT!!!!!";
-    alertBox.className = "alert-popup"; // Set class to red
-    alertBox.style.display = "block";
-    triggerAlarm();
-  } else if (value === "NEAR" && isConnected) {
-    alertBox.textContent = "NEAR";
-    alertBox.className = "near-popup"; // Set class to green
-    alertBox.style.display = "block";
-    stopAlarm();
-  } else {
-    alertBox.style.display = "none"; // Hide if other value
-  }
-}
-
-    function triggerAlarm() {
-  if (!alarmActive) {
-    alertBox.style.display = "block";
-    playBeep(); // Play the beep sound
-    if ("vibrate" in navigator) {
-      navigator.vibrate([500, 200, 500, 200, 500]);
-    }
-    alarmActive = true;
-    console.log("Alarm triggered by ESP32!");
-  }
-}
-
-    function stopAlarm() {
-      if (alarmActive) {
-        if (oscillatorNode) { // Check if an oscillator is playing
-          oscillatorNode.stop(); // Stop the oscillator
-          oscillatorNode = null; // Clear the stored oscillator
-        }
-        if ("vibrate" in navigator) {
-          navigator.vibrate(0);
-        }
-        alarmActive = false;
-        console.log("Alarm stopped by ESP32!");
-      }
-    }
-  </script>
+  </script>
 </body>
 </html>
